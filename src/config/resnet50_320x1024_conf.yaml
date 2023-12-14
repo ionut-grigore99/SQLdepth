@@ -1,0 +1,22 @@
+#TODO: to put relevant description to each element in this yaml file.
+depth_encoder:
+  model_type: "resnet"
+  num_layers: 50 # number of ResNet layers used as depth encoder.
+  num_features: 256 # ResNet feature dim; basically these is used for decoder and upsampleBN; see the diagram.
+  model_dim: 32 # these are basically the number of channels of the resulted feature map S from the ResNet, ConvNeXt-L and Effb5 depth encoder.
+  dec_channels: [1024, 512, 256, 128] # decoder channels in Unet for the ConvNeXt-L and EfficientNetB5 depth encoder.
+
+depth_decoder:
+  patch_size: 20 # patch size before ViT: "we first apply a convolution of kernel size p x p and stride = p to S"; p=16 in paper!
+  dim_out: 128 # hyperparameyter used for bins regressor, where the final Linear Layer of the MLP used this dim_out!
+  query_nums: 128 # Q is a hyperparameyter (Q need to satisfy Q<=N=h*w/p^2 ! where (h,w) is the resolution of the output feature map S from the
+                 # depth encoder) used when we "generate a set of coarse-grained queries of shape R^(CxQ)".
+  dim_feedforward: 512 # this is used as hyperparameter for the TransformerEncoderLayer in depth decoder.
+  min_depth: 0.001 # this is the min depth used to calculate the center depths of the bins (see formula (7) from the paper).
+  max_depth: 80.0 # this is the max depth used to calculate the center depths of the bins (see formula (7) from the paper).
+
+pretrained_models_folder: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/pretrained/KITTI_ResNet50_320x1024_models'
+image_path_inference: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/img2.png'
+image_extension_inference: "png"
+use_cuda: False
+im_sz: [192, 640]

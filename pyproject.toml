@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SQLdepth"
+dynamic = ["version"]
+authors = [
+    { name = "Ionut-Orlando Grigore-Atimut", email = "ionut.grigore-atimut@student.upt.ro" }
+]
+
+description = "Self-supervised depth estimation for disertation thesis."
+readme = "README.md"
+requires-python = ">=3.8"
+
+dependencies = [
+    "pyyaml==6.0",
+    "einops==0.6.0",
+    "scipy==1.9.1",
+    "pytorch-model-summary==0.1.2",
+    "opencv-python==4.7.0.72",
+    "numpy==1.24.4",
+    "tensorboard==2.12.0",
+    "kornia==0.6.10",
+    "onnx==1.13.0",
+    "lovely-tensors==0.1.15"
+]
+
+[project.optional-dependencies]
+dev = [
+    "torch==1.12.0",
+    "torchvision==0.13.0",
+    "imgaug==0.4.0",
+    "matplotlib==3.7.1"
+]
+
+[tool.setuptools.packages.find]
+include = ["src"]
+exclude = ["notebooks"]

@@ -4,8 +4,9 @@ FOR DEBUGING AND VERYFING FUNCTIONALITIES OF THE POSE_ENCODER AND POSE_DECODER
 
 import torch
 import lovely_tensors as lt
-from pytorch_model_summary import summary
-from torchsummary import summary
+from pytorch_model_summary import summary as psummary
+from torchsummary import summary as tsummary
+# I need to give different names to these 2 summary above
 
 from .pose_cnn import PoseCNN
 from .pose_decoder import PoseDecoder
@@ -14,7 +15,7 @@ if __name__=="__main__":
 
     lt.monkey_patch()
 
-    pose_cnn=False
+    pose_cnn=True
 
     if pose_cnn==True:
         model=PoseCNN(num_input_frames=2)
@@ -23,8 +24,8 @@ if __name__=="__main__":
         input=torch.cat((x1, x2), dim=1)
 
         ######## 3 WAYS OF VISUALIZING THE ARCHITECTURE ########
-        #architecture = summary(model, input, max_depth=4, show_parent_layers=True, print_summary=True)
-        summary(model, (6, 640, 192)) # USE WITHOUT BATCH DIMENSION, IT AUTOMATICALLY PUT -1 FOR IT
+        #architecture = psummary(model, input, max_depth=4, show_parent_layers=True, print_summary=True)
+        tsummary(model, (6, 640, 192)) # USE WITHOUT BATCH DIMENSION, IT AUTOMATICALLY PUT -1 FOR IT
         # print(model)
         #y=model(input)
 
@@ -35,7 +36,7 @@ if __name__=="__main__":
         input=torch.cat((x1, x2), dim=1)
 
         ######## 3 WAYS OF VISUALIZING THE ARCHITECTURE ########
-        # architecture = summary(model, input, max_depth=4, show_parent_layers=True, print_summary=True)
-        summary(model, (6, 640, 192))
+        # architecture = psummary(model, input, max_depth=4, show_parent_layers=True, print_summary=True)
+        tsummary(model, (6, 640, 192))
         # print(model)
         #y = model(input)
