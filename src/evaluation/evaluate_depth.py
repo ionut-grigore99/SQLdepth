@@ -3,29 +3,33 @@ from __future__ import absolute_import, division, print_function
 import os
 import cv2
 import numpy as np
-
 import torch
+import lovely_tensors as lt
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard.writer import SummaryWriter
 
-from layers import disp_to_depth
-from utils import readlines
-import datasets
-import networks
+from ..utils import readlines, normalize_image, disp_to_depth
+from ..models.SQLDepth import SQLdepth
+from ..datasets.kitti_dataset import KITTIRAWDataset
+from ..config.conf import ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf, ResNet50_320x1024_Conf, ResNet50_192x640_Conf
 
-DIMS_EMBEDDING = 54
 cv2.setNumThreads(0)  # This speeds up evaluation 5x on our unix systems (OpenCV 3.3.1)
 
-
-splits_dir = os.path.join(os.path.dirname(__file__), "splits")
-
 # Models which were trained with stereo supervision were trained with a nominal baseline of 0.1 units.
-# The KITTI rig has a baseline of 54cm. Therefore, to convert our stereo predictions to real-world scale we multiply our depths by 5.4.
+# The KITTI rig has a baseline of 54cm.
+# Therefore, to convert our stereo predictions to real-world scale we multiply our depths by 5.4.
 STEREO_SCALE_FACTOR = 5.4
+writers = {}
+
+current_file_path = os.path.dirname(__file__)
+up_two_levels = os.path.join(current_file_path, '..')
+splits_dir = os.path.join(up_two_levels, 'data', 'kitti/kitti_splits')
+splits_dir = os.path.normpath(splits_dir)
 
 
 def compute_errors(gt, pred):
     """
-        Computation of error metrics between predicted and ground truth depths
+        Computation of error metrics between predicted and ground truth depths.
     """
     thresh = np.maximum((gt / pred), (pred / gt))
     a1 = (thresh < 1.25     ).mean()
@@ -46,7 +50,9 @@ def compute_errors(gt, pred):
 
 
 def batch_post_process_disparity(l_disp, r_disp):
-    """Apply the disparity post-processing method as introduced in Monodepthv1
+    """
+        Apply the disparity post-processing method as introduced in Monodepthv1.
+        "Unsupervised Monocular Depth Estimation With Left-Right Consistency" paper, pg 5-bottom right.
     """
     _, h, w = l_disp.shape
     m_disp = 0.5 * (l_disp + r_disp)
@@ -56,110 +62,111 @@ def batch_post_process_disparity(l_disp, r_disp):
     return r_mask * l_disp + l_mask * r_disp + (1.0 - l_mask - r_mask) * m_disp
 
 
-def evaluate(opt):
-    """Evaluates a pretrained model using a specified test set
+def evaluate(conf):
+    """
+        Evaluates a pretrained model using a specified test set.
     """
     MIN_DEPTH = 1e-3
     MAX_DEPTH = 80
 
-    assert sum((opt.eval_mono, opt.eval_stereo)) == 1, \
-        "Please choose mono or stereo evaluation by setting either --eval_mono or --eval_stereo"
+    get = lambda x: conf.get(x)
+    writers["vis"] = SummaryWriter(os.path.join(get('tensorboard_path'), "vis"))
+    pretrained_models_folder=get('pretrained_models_folder')
+    disable_median_scaling=get('disable_median_scaling')
+    prediction_depth_scale_factor=get('prediction_depth_scale_factor')
 
-    if opt.ext_disp_to_eval is None:
 
-        opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
+    assert get('evaluation_mode') in ["mono", "stereo"], "Please choose mono or stereo evaluation by setting evaluation_mode to 'mono' or 'stereo'!"
 
-        assert os.path.isdir(opt.load_weights_folder), \
-            "Cannot find a folder at {}".format(opt.load_weights_folder)
+    if get('numpy_disparities_to_evaluate') is None:
 
-        print("-> Loading weights from {}".format(opt.load_weights_folder))
+        pretrained_models_folder = os.path.expanduser(pretrained_models_folder)
 
-        filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-        encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
-        decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
+        assert os.path.isdir(get('pretrained_models_folder')), "Cannot find a folder at {}".format(get('pretrained_models_folder'))
 
-        encoder_dict = torch.load(encoder_path)
+        print("-> Loading weights from {}".format(get('pretrained_models_folder')))
 
-        dataset = datasets.KITTIRAWDataset(opt.data_path, filenames,
-                                           encoder_dict['height'], encoder_dict['width'],
-                                           [0], 4, is_train=False)
-        dataloader = DataLoader(dataset, 4, shuffle=False, num_workers=opt.num_workers,
-                                pin_memory=True, drop_last=False)
+        filenames = readlines(os.path.join(splits_dir, get('evaluation_split'), "test_files.txt"))
+        encoder_path = os.path.join(get('pretrained_models_folder'), "encoder.pth")
+        decoder_path = os.path.join(get('pretrained_models_folder'), "depth.pth")
 
-        # encoder = networks.ResnetEncoder(opt.num_layers, False)
-        encoder = networks.BaseEncoder.build(model_dim=128)
-        # depth_decoder = networks.DepthDecoder(encoder.num_ch_enc)
-        depth_decoder = networks.Depth_Decoder_QueryTr(in_channels=128, patch_size=8,dim_out=100, embedding_dim=128,
-                                                                query_nums=128, num_heads=4,
-                                                                min_val=0.1, max_val=10.0)
-        # depth_decoder = networks.Depth_Decoder_QueryTr(DIMS_EMBEDDING, n_query_channels=DIMS_EMBEDDING, patch_size=16,
-        #                                 dim_out=100,
-        #                                 embedding_dim=DIMS_EMBEDDING, norm='linear')
+        encoder_dict = torch.load(encoder_path, map_location=torch.device('cpu'))
 
-        model_dict = encoder.state_dict()
-        encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})
-        depth_decoder.load_state_dict(torch.load(decoder_path))
+        dataset = KITTIRAWDataset(get('data_path'), filenames, encoder_dict['height'], encoder_dict['width'], [0], 1, is_train=False)
+        dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=get('num_workers'), pin_memory=True, drop_last=False)
 
-        encoder.cuda()
-        encoder.eval()
-        depth_decoder.cuda()
-        depth_decoder.eval()
+        model = SQLdepth(conf)
+        model.from_pretrained() # NOTE: it's a bit weird their loading because they actually load only the weights for the
+                                # decoder, for encoder they don't use torch.load(weights)!
+
+        # I currently comment these because I will verifiy later on the server the functionality.
+        # model.encoder.cuda()
+        # encoder = torch.nn.DataParallel(model.encoder)
+        #
+        # model.depth_decoder.cuda()
+        # depth_decoder = torch.nn.DataParallel(model.depth_decoder)
+
 
         pred_disps = []
+        src_imgs = []
+        error_maps = []
 
-        print("-> Computing predictions with size {}x{}".format(
-            encoder_dict['width'], encoder_dict['height']))
+        print("-> Computing predictions with size {}x{}".format(encoder_dict['width'], encoder_dict['height']))
 
+        step = 0
         with torch.no_grad():
             for data in dataloader:
-                input_color = data[("color", 0, 0)].cuda()
-                # print(input_color.shape, " shape") # torch.Size([16, 3, 176, 352])
-                # print(input_color.min(), " min") # 0.0
-                # print(input_color.max(), " max") # 1.0
+                step = step + 1
+                # input_color = data[("color", 0, 0)].cuda()
+                input_color = data[("color", 0, 0)]
+                breakpoint()
 
-                if opt.post_process:
-                    # print("post_process *********")
+                if get('evaluation_post_process'): # for flipping post processing from the original Monodepth paper!
                     # Post-processed results require each image to have two forward passes
                     input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0)
 
-                output = depth_decoder(encoder(input_color))
+                output = model(input_color)
 
-                pred_disp, _ = disp_to_depth(output[("disp", 0)], opt.min_depth, opt.max_depth)
-                # print(pred_disp.min(), " min")
-                # print(pred_disp.max(), " max")
+                pred_disp = output
                 pred_disp = pred_disp.cpu()[:, 0].numpy()
 
-                if opt.post_process:
+                if get('evaluation_post_process'): # flipping post processing from the original Monodepth paper!
                     N = pred_disp.shape[0] // 2
                     pred_disp = batch_post_process_disparity(pred_disp[:N], pred_disp[N:, :, ::-1])
 
                 pred_disps.append(pred_disp)
+                # src_imgs.append(data[("color", 0, 0)])
 
         pred_disps = np.concatenate(pred_disps)
+        # src_imgs = np.concatenate(src_imgs)
 
-    else:
+    else: # o prostie chestia asta oricum pentru ca nu o folosesc.
         # Load predictions from file
-        print("-> Loading predictions from {}".format(opt.ext_disp_to_eval))
-        pred_disps = np.load(opt.ext_disp_to_eval)
+        print("-> Loading predictions from {}".format(get('ext_disp_to_eval')))
+        pred_disps = np.load(get('numpy_disparities_to_evaluate'))
 
-        if opt.eval_eigen_to_benchmark:
-            eigen_to_benchmark_ids = np.load(
-                os.path.join(splits_dir, "benchmark", "eigen_to_benchmark_ids.npy"))
-
+        if get('evaluate_eigen_to_benchmark'):
+            eigen_to_benchmark_ids = np.load(os.path.join(splits_dir, "benchmark", "eigen_to_benchmark_ids.npy"))
+            #IDK where to find eigen_to_benchmark_ids.npy file!.
             pred_disps = pred_disps[eigen_to_benchmark_ids]
 
-    if opt.save_pred_disps:
-        output_path = os.path.join(
-            opt.load_weights_folder, "disps_{}_split.npy".format(opt.eval_split))
+    if get('save_predicted_disparities'):
+        output_path = os.path.join(get('pretrained_models_folder'), "disps_{}_split.npy".format(get('evaluation_split')))
         print("-> Saving predicted disparities to ", output_path)
         np.save(output_path, pred_disps)
+        # src_imgs_path = os.path.join(get('pretrained_models_folder'), "src_{}_split.npy".format(get('evaluation_split')))
+        # print("-> Saving src imgs to ", src_imgs_path)
+        # np.save(src_imgs_path, src_imgs)
 
-    if opt.no_eval:
+    if get('no_evaluation'):  # basically I've just calculated the predicted disparities and maybe save them.
         print("-> Evaluation disabled. Done.")
         quit()
-
-    elif opt.eval_split == 'benchmark':
-        save_dir = os.path.join(opt.load_weights_folder, "benchmark_predictions")
+###########################################################################################################################################################
+###########################################################################################################################################################
+###########################################################################################################################################################
+###########################################################################################################################################################
+    elif get('evaluation_split') == 'benchmark':
+        save_dir = os.path.join(get('load_weights_folder'), "benchmark_predictions")
         print("-> Saving out benchmark predictions to {}".format(save_dir))
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -175,16 +182,16 @@ def evaluate(opt):
         print("-> No ground truth is available for the KITTI benchmark, so not evaluating. Done.")
         quit()
 
-    gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
-    gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+    gt_path = os.path.join(splits_dir, get('evaluation_split'), "gt_depths.npz")
+    gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1', allow_pickle=True)["data"]
 
     print("-> Evaluating")
 
-    if opt.eval_stereo:
+    if get('evaluation_mode')=="stereo":
         print("   Stereo evaluation - "
               "disabling median scaling, scaling by {}".format(STEREO_SCALE_FACTOR))
-        opt.disable_median_scaling = True
-        opt.pred_depth_scale_factor = STEREO_SCALE_FACTOR
+        disable_median_scaling = True
+        prediction_depth_scale_factor = STEREO_SCALE_FACTOR
     else:
         print("   Mono evaluation - using median scaling")
 
@@ -199,9 +206,8 @@ def evaluate(opt):
         pred_disp = pred_disps[i]
         pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
         pred_depth = pred_disp
-        # pred_depth = 1 / pred_disp
 
-        if opt.eval_split == "eigen":
+        if get('evaluation_split') == "eigen":
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
 
             crop = np.array([0.40810811 * gt_height, 0.99189189 * gt_height,
@@ -213,11 +219,14 @@ def evaluate(opt):
         else:
             mask = gt_depth > 0
 
+        error_map = np.abs(gt_depth - pred_depth)
         pred_depth = pred_depth[mask]
         gt_depth = gt_depth[mask]
+        error_map = np.multiply(error_map, mask)
+        error_maps.append(error_map)
 
-        pred_depth *= opt.pred_depth_scale_factor
-        if not opt.disable_median_scaling:
+        pred_depth *= prediction_depth_scale_factor
+        if not disable_median_scaling:
             ratio = np.median(gt_depth) / np.median(pred_depth)
             ratios.append(ratio)
             pred_depth *= ratio
@@ -227,11 +236,15 @@ def evaluate(opt):
 
         errors.append(compute_errors(gt_depth, pred_depth))
 
-    if not opt.disable_median_scaling:
+    if not disable_median_scaling:
         ratios = np.array(ratios)
         med = np.median(ratios)
         print(" Scaling ratios | med: {:0.3f} | std: {:0.3f}".format(med, np.std(ratios / med)))
 
+    if get('save_predicted_disparities'):
+        error_map_path = os.path.join(get('pretrained_models_folder'), "error_{}_split.npy".format(get('eval_split')))
+        print("-> Saving error maps to ", error_map_path)
+        np.savez_compressed(error_map_path, data=np.array(error_maps, dtype="object"))
     mean_errors = np.array(errors).mean(0)
 
     print("\n  " + ("{:>8} | " * 7).format("abs_rel", "sq_rel", "rmse", "rmse_log", "a1", "a2", "a3"))
@@ -240,5 +253,12 @@ def evaluate(opt):
 
 
 if __name__ == "__main__":
-    options = MonodepthOptions()
-    evaluate(options.parse())
+
+    lt.monkey_patch()
+
+    conf = ResNet50_320x1024_Conf().conf  # ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
+    get = lambda x: conf.get(x)
+
+    evaluate(conf)
+
+

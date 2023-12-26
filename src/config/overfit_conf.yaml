@@ -1,4 +1,6 @@
 #TODO: to put relevant description to each element in this yaml file.
+model_name: "resnet50_320x1024"
+
 depth_encoder:
   model_type: "resnet" # choices: "resnet", "efficientnet", "convnextL"
   num_layers: 50 # number of ResNet layers used as depth encoder.
@@ -15,10 +17,32 @@ depth_decoder:
   min_depth: 0.001 # this is the min depth used to calculate the center depths of the bins (see formula (7) from the paper).
   max_depth: 80.0 # this is the max depth used to calculate the center depths of the bins (see formula (7) from the paper).
 
+
+# misc
+# -----------
+data_path: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/data/kitti/kitti_data'
+tensorboard_path: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/tensorboard'
 pretrained_models_folder: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/pretrained/KITTI_ResNet50_192x640_models'
                           # KITTI_ResNet50_320x1024_models, KITTI_ResNet50_192x640_models,
                           # KITTI_EfficientNetB5_320x1024_models, KITTI_ConvNeXt_Large_320x1024_models
-image_path_inference: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/img2.png'
+image_path_inference: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images/img2.png'
+                     # I can also give an entire folder with images, not just one image!
+                     # choices: ['/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images/img2.png',
+                     #          '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images']
 image_extension_inference: "png"
 use_cuda: False
+num_workers: 0
 im_sz: [192, 640]
+bs: 8
+
+# evaluation
+# -----------
+evaluation_split: eigen #choices=["eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10", "cityscapes"]
+evaluation_mode: mono # choices=["mono", "stereo"]
+evaluation_post_process: True # if set will perform the flipping post processing from the original Monodepth paper.
+prediction_depth_scale_factor: 1 # if set multiplies predictions by this number.
+save_predicted_disparities: True # if set saves predicted disparities.
+numpy_disparities_to_evaluate: None # optional path to a .npy disparities file to evaluate.
+evaluate_eigen_to_benchmark: False # if set assume we are loading eigen results from .npy but we want to evaluate using the new benchmark.
+no_evaluation: False # if set disables evaluation
+disable_median_scaling: True # if set disables median scaling in evaluation.
