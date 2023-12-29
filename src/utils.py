@@ -140,3 +140,13 @@ def get_smooth_loss(disp, img):
     grad_disp_y *= torch.exp(-grad_img_y)
 
     return grad_disp_x.mean() + grad_disp_y.mean()
+
+def count_parameters(model):
+    total_params = 0
+    for _, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        param = parameter.numel()
+        total_params+=param
+    print(f"Total Trainable Params: {total_params}")
+    return total_params

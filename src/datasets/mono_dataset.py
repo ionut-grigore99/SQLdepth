@@ -4,6 +4,7 @@ import os
 import random
 import numpy as np
 import copy
+import PIL
 from PIL import Image  # using pillow-simd for increased speed
 
 import torch
@@ -43,7 +44,7 @@ class MonoDataset(data.Dataset):
         self.height = height
         self.width = width
         self.num_scales = num_scales
-        self.interp = Image.ANTIALIAS # interpolation method
+        self.interp = PIL.Image.Resampling.LANCZOS # interpolation method
         self.frame_idxs = frame_idxs
         self.is_train = is_train
         self.img_ext = img_ext

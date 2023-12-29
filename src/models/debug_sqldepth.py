@@ -16,8 +16,10 @@ if __name__=="__main__":
      model = SQLdepth(conf)
      #architecture = psummary(model, torch.rand(1, 3, 640, 192), max_depth=4, show_parent_layers=True, print_summary=True)
      #architecture = psummary(model, torch.rand(1, 3, 224, 224), max_depth=4, show_parent_layers=True, print_summary=True)
+     # architecture = psummary(model, torch.rand(1, 3, 1024, 320), max_depth=4, show_parent_layers=True, print_summary=True)
      #tsummary(model, (3, 640, 192))  # USE WITHOUT BATCH DIMENSION, IT AUTOMATICALLY PUT -1 FOR IT
      #tsummary(model, (3, 224, 224))
+     # tsummary(model, (3, 1024, 320))
      #print(model)
      #y=model(torch.rand(1, 3, 640, 192))
      #y=model(torch.rand(1, 3, 224, 224))

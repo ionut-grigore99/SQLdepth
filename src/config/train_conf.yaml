@@ -67,8 +67,8 @@ evaluation_split: eigen #choices=["eigen", "eigen_benchmark", "benchmark", "odom
 evaluation_mode: mono # choices=["mono", "stereo"]
 evaluation_post_process: True # if set will perform the flipping post processing from the original Monodepth paper.
 prediction_depth_scale_factor: 1 # if set multiplies predictions by this number.
-save_predicted_disparities: True # if set saves predicted disparities.
-numpy_disparities_to_evaluate: None # optional path to a .npy disparities file to evaluate.
+save_predicted_disparities: False # if set saves predicted disparities.
+numpy_disparities_to_evaluate:  # optional path to a .npy disparities file to evaluate.
 evaluate_eigen_to_benchmark: False # if set assume we are loading eigen results from .npy but we want to evaluate using the new benchmark.
 no_evaluation: False # if set disables evaluation
 disable_median_scaling: True # if set disables median scaling in evaluation.

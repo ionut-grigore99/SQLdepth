@@ -4,11 +4,11 @@ import os
 import cv2
 import numpy as np
 import torch
+from tqdm import tqdm
 import lovely_tensors as lt
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard.writer import SummaryWriter
 
-from ..utils import readlines, normalize_image, disp_to_depth
+from ..utils import readlines, count_parameters
 from ..models.SQLDepth import SQLdepth
 from ..datasets.kitti_dataset import KITTIRAWDataset
 from ..config.conf import ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf, ResNet50_320x1024_Conf, ResNet50_192x640_Conf
@@ -19,7 +19,6 @@ cv2.setNumThreads(0)  # This speeds up evaluation 5x on our unix systems (OpenCV
 # The KITTI rig has a baseline of 54cm.
 # Therefore, to convert our stereo predictions to real-world scale we multiply our depths by 5.4.
 STEREO_SCALE_FACTOR = 5.4
-writers = {}
 
 current_file_path = os.path.dirname(__file__)
 up_two_levels = os.path.join(current_file_path, '..')
@@ -70,8 +69,6 @@ def evaluate(conf):
     MAX_DEPTH = 80
 
     get = lambda x: conf.get(x)
-    writers["vis"] = SummaryWriter(os.path.join(get('tensorboard_path'), "vis"))
-    pretrained_models_folder=get('pretrained_models_folder')
     disable_median_scaling=get('disable_median_scaling')
     prediction_depth_scale_factor=get('prediction_depth_scale_factor')
 
@@ -79,56 +76,58 @@ def evaluate(conf):
     assert get('evaluation_mode') in ["mono", "stereo"], "Please choose mono or stereo evaluation by setting evaluation_mode to 'mono' or 'stereo'!"
 
     if get('numpy_disparities_to_evaluate') is None:
-
-        pretrained_models_folder = os.path.expanduser(pretrained_models_folder)
-
+        breakpoint()
         assert os.path.isdir(get('pretrained_models_folder')), "Cannot find a folder at {}".format(get('pretrained_models_folder'))
 
         print("-> Loading weights from {}".format(get('pretrained_models_folder')))
 
         filenames = readlines(os.path.join(splits_dir, get('evaluation_split'), "test_files.txt"))
-        encoder_path = os.path.join(get('pretrained_models_folder'), "encoder.pth")
-        decoder_path = os.path.join(get('pretrained_models_folder'), "depth.pth")
 
-        encoder_dict = torch.load(encoder_path, map_location=torch.device('cpu'))
-
-        dataset = KITTIRAWDataset(get('data_path'), filenames, encoder_dict['height'], encoder_dict['width'], [0], 1, is_train=False)
+        dataset = KITTIRAWDataset(get('data_path'), filenames, conf.get('im_sz')[0], conf.get('im_sz')[1], [0], 1, is_train=False)
         dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=get('num_workers'), pin_memory=True, drop_last=False)
+        # the drop_last=True parameter ignores the last batch (when the number of examples in your dataset is not divisible by your batch_size)
+        # while drop_last=False will make the last batch smaller than your batch_size.
 
         model = SQLdepth(conf)
-        model.from_pretrained() # NOTE: it's a bit weird their loading because they actually load only the weights for the
-                                # decoder, for encoder they don't use torch.load(weights)!
+        count_parameters(model.encoder)
+        count_parameters(model.depth_decoder)
+        model.from_pretrained()
 
-        # I currently comment these because I will verifiy later on the server the functionality.
-        # model.encoder.cuda()
-        # encoder = torch.nn.DataParallel(model.encoder)
+        # model.to('cuda')
+        # model = torch.nn.DataParallel(model)
+        # model.eval()
+
+        # model.encoder.to('cuda')
+        # model.encoder = torch.nn.DataParallel(model.encoder)
+        # model.encoder.eval()
         #
-        # model.depth_decoder.cuda()
-        # depth_decoder = torch.nn.DataParallel(model.depth_decoder)
+        # model.depth_decoder.to('cuda')
+        # model.depth_decoder = torch.nn.DataParallel(model.depth_decoder)
+        # model.depth_decoder.eval()
 
 
         pred_disps = []
         src_imgs = []
         error_maps = []
 
-        print("-> Computing predictions with size {}x{}".format(encoder_dict['width'], encoder_dict['height']))
+        print("-> Computing predictions with size {}x{}".format(conf.get('im_sz')[1], conf.get('im_sz')[0]))
 
         step = 0
         with torch.no_grad():
-            for data in dataloader:
+            for data in tqdm(dataloader):
                 step = step + 1
                 # input_color = data[("color", 0, 0)].cuda()
-                input_color = data[("color", 0, 0)]
+                input_color = data[("color", 0, 0)] # tensor[1, 3, 320, 1024] with values between 0 and 1!
                 breakpoint()
 
                 if get('evaluation_post_process'): # for flipping post processing from the original Monodepth paper!
                     # Post-processed results require each image to have two forward passes
-                    input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0)
+                    input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0) # tensor[2, 3, 320, 1024] with values between 0 and 1!
 
                 output = model(input_color)
 
                 pred_disp = output
-                pred_disp = pred_disp.cpu()[:, 0].numpy()
+                pred_disp = pred_disp.cpu()[:, 0].numpy()  # if get('evaluation_post_process') is True, then pred_disp.shape is (2, 160, 512) <-> (2, H/2, W/2)
 
                 if get('evaluation_post_process'): # flipping post processing from the original Monodepth paper!
                     N = pred_disp.shape[0] // 2
@@ -142,12 +141,12 @@ def evaluate(conf):
 
     else: # o prostie chestia asta oricum pentru ca nu o folosesc.
         # Load predictions from file
-        print("-> Loading predictions from {}".format(get('ext_disp_to_eval')))
+        print("-> Loading predictions from {}".format(get('numpy_disparities_to_evaluate')))
         pred_disps = np.load(get('numpy_disparities_to_evaluate'))
 
         if get('evaluate_eigen_to_benchmark'):
             eigen_to_benchmark_ids = np.load(os.path.join(splits_dir, "benchmark", "eigen_to_benchmark_ids.npy"))
-            #IDK where to find eigen_to_benchmark_ids.npy file!.
+            #IDK where to find eigen_to_benchmark_ids.npy file!
             pred_disps = pred_disps[eigen_to_benchmark_ids]
 
     if get('save_predicted_disparities'):
@@ -161,10 +160,7 @@ def evaluate(conf):
     if get('no_evaluation'):  # basically I've just calculated the predicted disparities and maybe save them.
         print("-> Evaluation disabled. Done.")
         quit()
-###########################################################################################################################################################
-###########################################################################################################################################################
-###########################################################################################################################################################
-###########################################################################################################################################################
+
     elif get('evaluation_split') == 'benchmark':
         save_dir = os.path.join(get('load_weights_folder'), "benchmark_predictions")
         print("-> Saving out benchmark predictions to {}".format(save_dir))

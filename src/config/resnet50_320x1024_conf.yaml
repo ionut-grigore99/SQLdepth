@@ -29,7 +29,7 @@ image_path_inference: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/infere
 image_extension_inference: "png"
 use_cuda: False
 num_workers: 0
-im_sz: [320, 1024]
+im_sz: [320, 1024] # H W
 bs: 16
 
 # training

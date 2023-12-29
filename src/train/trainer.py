@@ -10,7 +10,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 import json
-from collections import OrderedDict
 
 
 from ..config.conf import ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
