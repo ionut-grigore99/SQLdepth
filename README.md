@@ -82,11 +82,11 @@ python -m src.evaluation.evaluate_depth
 
 #### Evaluation split: eigen
 | Model     | Params | WxH | abs rel | sq rel | RMSE  | RMSE log | a1    | a2    | a3    |
-|-----------|--------|-----|---------|-------|-------|-------|-------|-------|-------|
-| KITTI (ResNet-50)    | 31,051,944  | 640x192 | 0.088   | 0.698 | 4.175 | 0.167 | 0.919 | 0.969 | 0.984 |
-| KITTI (ResNet-50) | 37,782,824  | 1024x320	 | 0.083   | 0.610 | 3.921 | 0.160 | 0.928 | 0.972 | 0.985 |
-| KITTI (Efficient-b5) | 45,702,416  | 1024x320 | 0.084   | 0.539 | 3.897 | 0.162 | 0.924 | 0.971 | 0.985 |
-| KITTI (ConvNeXt-L) | 242,150,304  | 1024x320 | 0.074   | 0.491 | 3.578 | 0.150 | 0.939 | 0.974 | 0.986 |
+|-----------|--------|-----|---------|--------|-------|-------|-------|-------|-------|
+| KITTI (ResNet-50)    | 31,051,944  | 640x192 | 0.088   | 0.698  | 4.175 | 0.167 | 0.919 | 0.969 | 0.984 |
+| KITTI (ResNet-50) | 37,782,824  | 1024x320	 | 0.082   | 0.607  | 3.914 | 0.160 | 0.928 | 0.972 | 0.985 |
+| KITTI (Efficient-b5) | 45,702,416  | 1024x320 | 0.084   | 0.539  | 3.897 | 0.162 | 0.924 | 0.971 | 0.985 |
+| KITTI (ConvNeXt-L) | 242,150,304  | 1024x320 | 0.074   | 0.491  | 3.578 | 0.150 | 0.939 | 0.974 | 0.986 |
 
 #### Paper reported results:
 ![img.png](assets/paper_reported_results_eigen.png)
@@ -106,6 +106,14 @@ python -m src.train.trainer
 ```
 
 ## Local overfit
+
+The goal was to see if the SQLDepth architecture could be
+overfit on a small batch of samples—typically one, two, or five images.
+The ability to overfit is a litmus test for model capacity, and visual 
+aids, such as the rendering of predicted depth maps, were instrumental in evaluating 
+the success. If overfitting was achieved with satisfactory visual 
+confirmation, the next logical step involved deploying the entire 
+training pipeline on my ec2 instance, utilizing the full dataset.
 ```bash
 python -m src.overfit.local_trainer
 ```

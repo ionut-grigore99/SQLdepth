@@ -14,7 +14,7 @@ depth_decoder:
   query_nums: 128 # Q is a hyperparameyter (Q need to satisfy Q<=N=h*w/p^2 ! where (h,w) is the resolution of the output feature map S from the
                  # depth encoder) used when we "generate a set of coarse-grained queries of shape R^(CxQ)".
   dim_feedforward: 512 # this is used as hyperparameter for the TransformerEncoderLayer in depth decoder.
-  min_depth: 0.001 # this is the min depth used to calculate the center depths of the bins (see formula (7) from the paper).
+  min_depth: 0.01 # this is the min depth used to calculate the center depths of the bins (see formula (7) from the paper).
   max_depth: 80.0 # this is the max depth used to calculate the center depths of the bins (see formula (7) from the paper).
 
 # misc
