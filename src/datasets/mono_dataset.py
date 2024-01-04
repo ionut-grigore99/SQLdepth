@@ -122,7 +122,6 @@ class MonoDataset(data.Dataset):
             3       images resized to (self.width // 8, self.height // 8)
         """
         inputs = {}
-
         do_color_aug = self.is_train and random.random() > 0.5
         do_flip = self.is_train and random.random() > 0.5
 
@@ -152,7 +151,6 @@ class MonoDataset(data.Dataset):
             K = self.K.copy()
 
             K[0, :] *= self.width // (2 ** scale)
-            # 这里是为了做norm，内参矩阵必须是归一化的
             K[1, :] *= self.height // (2 ** scale)
 
             inv_K = np.linalg.pinv(K)

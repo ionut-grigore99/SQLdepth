@@ -25,7 +25,6 @@ class KITTIDataset(MonoDataset):
                            [0, 1.92, 0.5, 0],
                            [0, 0, 1, 0],
                            [0, 0, 0, 1]], dtype=np.float32)
-# K是相机内参 stereo_T是相机外参，也就是转换矩阵,4行4列，16维度
         self.full_res_shape = (1242, 375)
         self.side_map = {"2": 2, "3": 3, "l": 2, "r": 3}
 
@@ -65,7 +64,6 @@ class KITTIRAWDataset(KITTIDataset):
 
     def get_depth(self, folder, frame_index, side, do_flip):
         calib_path = os.path.join(self.data_path, folder.split("/")[0])
-
         velo_filename = os.path.join(
             self.data_path,
             folder,

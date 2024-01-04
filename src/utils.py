@@ -13,8 +13,8 @@ def normalize_image(im):
     """
         Rescale image pixels to span range [0, 1].
     """
-    maximum = float(im.maximum().cpu().data)
-    minimum = float(im.minimum().cpu().data)
+    maximum = float(torch.max(im).cpu().item())
+    minimum = float(torch.min(im).cpu().item())
     d = maximum - minimum if maximum != minimum else 1e5
     return (im - minimum) / d
 
@@ -125,21 +125,67 @@ def transformation_from_parameters(axisangle, translation, invert=False):
 
     return M
 
-def get_smooth_loss(disp, img):
+def predict_poses(conf, models, inputs, features):
     """
-        Computes the smoothness loss for a disparity image.
-        The color image is used for edge-aware smoothness.
+        Predict poses between input frames for monocular sequences.
     """
-    grad_disp_x = torch.abs(disp[:, :, :, :-1] - disp[:, :, :, 1:])
-    grad_disp_y = torch.abs(disp[:, :, :-1, :] - disp[:, :, 1:, :])
+    outputs = {}
 
-    grad_img_x = torch.mean(torch.abs(img[:, :, :, :-1] - img[:, :, :, 1:]), 1, keepdim=True)
-    grad_img_y = torch.mean(torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :]), 1, keepdim=True)
+    num_input_frames = len(conf.get('frame_ids_training'))
+    num_pose_frames = 2 if conf.get('pose_model_input') == "pairs" else num_input_frames
+    if num_pose_frames == 2:
+        # In this setting, we compute the pose to each source frame via a
+        # separate forward pass through the pose network.
 
-    grad_disp_x *= torch.exp(-grad_img_x)
-    grad_disp_y *= torch.exp(-grad_img_y)
+        # select what features the pose network takes as input
+        if conf.get('pose_model_type') == "shared":
+            pose_feats = {f_i: features[f_i] for f_i in conf.get('frame_ids_training')}
+        else:
+            pose_feats = {f_i: inputs["color_aug", f_i, 0] for f_i in conf.get('frame_ids_training')}
 
-    return grad_disp_x.mean() + grad_disp_y.mean()
+        for f_i in conf.get('frame_ids_training')[1:]:
+            if f_i != "s":
+                # To maintain ordering we always pass frames in temporal order
+                if f_i < 0:
+                    pose_inputs = [pose_feats[f_i], pose_feats[0]]
+                else:
+                    pose_inputs = [pose_feats[0], pose_feats[f_i]]
+
+                if conf.get('pose_model_type') == "separate_resnet":
+                    pose_inputs = [models["pose_encoder"](torch.cat(pose_inputs, 1))]
+                elif conf.get('pose_model_type') == "posecnn":
+                    pose_inputs = torch.cat(pose_inputs, 1)
+
+                axisangle, translation = models["pose_cnn"](pose_inputs)
+                outputs[("axisangle", 0, f_i)] = axisangle # axisangle:[12, 1, 1, 3]
+                outputs[("translation", 0, f_i)] = translation # translation:[12, 1, 1, 3]
+
+                # Invert the matrix if the frame id is negative
+                outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(axisangle[:, 0], translation[:, 0], invert=(f_i < 0))
+                # outputs[("cam_T_cam", 0, f_i)]: [12, 4, 4]
+
+    else:
+        # Here we input all frames to the pose net (and predict all poses) together
+        if conf.get('pose_model_type') in ["separate_resnet", "posecnn"]:
+            pose_inputs = torch.cat(
+                [inputs[("color_aug", i, 0)] for i in conf.get('frame_ids_training') if i != "s"], 1)
+
+            if conf.get('pose_model_type') == "separate_resnet":
+                pose_inputs = [models["pose_encoder"](pose_inputs)]
+
+        elif conf.get('pose_model_type') == "shared":
+            pose_inputs = [features[i] for i in conf.get('frame_ids_training') if i != "s"]
+
+        axisangle, translation = models["pose"](pose_inputs)
+
+        for i, f_i in enumerate(conf.get('frame_ids_training')[1:]):
+            if f_i != "s":
+                outputs[("axisangle", 0, f_i)] = axisangle
+                outputs[("translation", 0, f_i)] = translation
+                outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(axisangle[:, i], translation[:, i])
+
+    return outputs
+
 
 def count_parameters(model):
     total_params = 0

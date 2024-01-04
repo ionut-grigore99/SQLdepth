@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
+import torch
 import torch.nn as nn
 
 
@@ -41,3 +42,9 @@ class PoseCNN(nn.Module):
         translation = out[..., 3:]
 
         return axisangle, translation
+
+    def from_pretrained(self, weights_path, device='cpu'):
+        loaded_dict_dec = torch.load(weights_path, map_location=device)
+        filtered_dict_dec = {k: v for k, v in loaded_dict_dec.items() if k in self.state_dict()}
+        self.load_state_dict(filtered_dict_dec)
+        self.eval()

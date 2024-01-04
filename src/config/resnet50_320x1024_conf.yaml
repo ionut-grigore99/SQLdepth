@@ -35,23 +35,21 @@ bs: 16
 # training
 # -----------
 training_dataset: "kitti" # dataset to train on; choices=["kitti", "kitti_odom", "kitti_depth", "kitti_test", "cityscapes_preprocessed", "nyu_raw"])
-num_epochs: 20 # number of epochs for training.
-training_split: "eigen_zhou" # which training split to use;  choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "cityscapes_preprocessed", "nyu_raw"],
-learning_rate: 1e-4
+num_epochs: 25 # number of epochs for training.
+training_split: "eigen_zhou" # which training split to use; choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "cityscapes_preprocessed", "nyu_raw"],
+learning_rate: 0.0001 # 1e-4
 scheduler_step_size: 15 # step size of the scheduler used for training.
-use_stereo_training: True # if set, uses stereo pair for training.
+use_stereo_training: False # if set, uses stereo pairs for training.
 frame_ids_training: [0, -1, 1] # frames to use for training (current, previous and next); choices: [0, -1, 1], [0, 1]
 loss_scales: [0] # scales used in the loss; choices: [0]; [0, 1, 2, 3]
 pose_model_input: "pairs" # how many images the pose network gets; choices=["pairs", "all"]
 load_pretrained_model: False # if set, uses pretrained encoder and depth decoder for training (both of them!).
 load_pretrained_pose: False # if set, uses pretrained PoseNet for training.
 train_from_png: True # if set, trains from raw KITTI png files (instead of jpgs).
-use_different_learning_rate: False # if set, uses different learning rate for training.
 save_frequency: 1 # number of epochs between each save.
 log_frequency: 10 # number of batches between each tensorboard log.
 use_ssim: True # if set, uses SSIM in the loss.
-use_predictive_mask: True # if set, uses a predictive masking scheme as in Zhou et al (in what paper?).
-disable_automasking: True # if set, doesn't do auto-masking.
+disable_automasking: False # if set, doesn't do auto-masking.
 disparity_smoothness_weight: 1e-3
 use_average_reprojection: True # if set, uses average reprojection loss.
 monodepthv1_multiscale: True # if set, uses Monodepthv1 multiscale.

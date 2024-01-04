@@ -5,7 +5,7 @@ import numpy as np
 
 class SSIM(nn.Module):
     """
-        Layer to compute the SSIM loss between a pair of images
+        Layer to compute the SSIM loss between a pair of images.
     """
 
     def __init__(self):
@@ -22,7 +22,7 @@ class SSIM(nn.Module):
         self.C1 = 0.01 ** 2
         self.C2 = 0.03 ** 2
 
-    def forward(self, x, y):
+    def forward(self, x, y): # a pair of images
         x = self.refl(x)
         y = self.refl(y)
 
@@ -34,14 +34,13 @@ class SSIM(nn.Module):
         sigma_xy = self.sig_xy_pool(x * y) - mu_x * mu_y
 
         SSIM_n = (2 * mu_x * mu_y + self.C1) * (2 * sigma_xy + self.C2)
-        SSIM_d = (mu_x ** 2 + mu_y ** 2 + self.C1) * \
-            (sigma_x + sigma_y + self.C2)
+        SSIM_d = (mu_x ** 2 + mu_y ** 2 + self.C1) * (sigma_x + sigma_y + self.C2)
 
         return torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1)
 
 class BackprojectDepth(nn.Module):
     """
-        Layer to transform a depth image into a point cloud
+        Layer to transform a depth image into a point cloud.
     """
     def __init__(self, batch_size, height, width):
         super(BackprojectDepth, self).__init__()
@@ -69,7 +68,7 @@ class BackprojectDepth(nn.Module):
 
 class Project3D(nn.Module):
     """
-        Layer which projects 3D points into a camera with intrinsics K and at position T
+        Layer which projects 3D points into a camera with intrinsics K and at position T.
     """
     def __init__(self, batch_size, height, width, eps=1e-7):
         super(Project3D, self).__init__()

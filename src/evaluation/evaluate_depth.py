@@ -30,20 +30,36 @@ def compute_errors(gt, pred):
     """
         Computation of error metrics between predicted and ground truth depths.
     """
-    thresh = np.maximum((gt / pred), (pred / gt))
-    a1 = (thresh < 1.25     ).mean()
-    a2 = (thresh < 1.25 ** 2).mean()
-    a3 = (thresh < 1.25 ** 3).mean()
+    if isinstance(gt, torch.Tensor) and isinstance(pred, torch.Tensor):
+        thresh = torch.max((gt / pred), (pred / gt))
+        a1 = (thresh < 1.25).float().mean()
+        a2 = (thresh < 1.25 ** 2).float().mean()
+        a3 = (thresh < 1.25 ** 3).float().mean()
 
-    rmse = (gt - pred) ** 2
-    rmse = np.sqrt(rmse.mean())
+        rmse = (gt - pred) ** 2
+        rmse = torch.sqrt(rmse.mean())
 
-    rmse_log = (np.log(gt) - np.log(pred)) ** 2
-    rmse_log = np.sqrt(rmse_log.mean())
+        rmse_log = (torch.log(gt) - torch.log(pred)) ** 2
+        rmse_log = torch.sqrt(rmse_log.mean())
 
-    abs_rel = np.mean(np.abs(gt - pred) / gt)
+        abs_rel = torch.mean(torch.abs(gt - pred) / gt)
 
-    sq_rel = np.mean(((gt - pred) ** 2) / gt)
+        sq_rel = torch.mean((gt - pred) ** 2 / gt)
+    else:
+        thresh = np.maximum((gt / pred), (pred / gt))
+        a1 = (thresh < 1.25     ).mean()
+        a2 = (thresh < 1.25 ** 2).mean()
+        a3 = (thresh < 1.25 ** 3).mean()
+
+        rmse = (gt - pred) ** 2
+        rmse = np.sqrt(rmse.mean())
+
+        rmse_log = (np.log(gt) - np.log(pred)) ** 2
+        rmse_log = np.sqrt(rmse_log.mean())
+
+        abs_rel = np.mean(np.abs(gt - pred) / gt)
+
+        sq_rel = np.mean(((gt - pred) ** 2) / gt)
 
     return abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3
 
@@ -76,7 +92,6 @@ def evaluate(conf):
     assert get('evaluation_mode') in ["mono", "stereo"], "Please choose mono or stereo evaluation by setting evaluation_mode to 'mono' or 'stereo'!"
 
     if get('numpy_disparities_to_evaluate') is None:
-        breakpoint()
         assert os.path.isdir(get('pretrained_models_folder')), "Cannot find a folder at {}".format(get('pretrained_models_folder'))
 
         print("-> Loading weights from {}".format(get('pretrained_models_folder')))
