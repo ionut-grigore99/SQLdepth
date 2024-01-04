@@ -5,6 +5,15 @@
 This is the implementation of the paper called "*SQLdepth: Generalizable Self-Supervised Fine-Structured Monocular Depth
 Estimation*" (https://arxiv.org/pdf/2309.00526.pdf) for my disertation thesis.
 
+## Theoretical prerequisites
+Fundamentally, self-supervised depth estimation is a form of Structure from Motion (SfM), where the monocular camera is moving within a rigid 
+environment to provide multiple views of that scene. 
+
+The seminal work in this field is "*Digging Into Self-Supervised Monocular Depth Estimation*" (https://arxiv.org/pdf/1806.01260.pdf) upon which 
+almost every self-supervised depth estimation method/paper/repo is based on (also our repo).
+
+![img.png](assets/theory_1.png)
+![img_2.png](assets/theory_2.png)
 ## Instalation
 
 First create a conda environment called **sqldepth**:
@@ -66,6 +75,10 @@ the raw KITTI `.png` files**:
 find src/data/kitti/kitti_data/ -name '*.png' | parallel 'convert -quality 92 -sampling-factor 2x2,1x1,1x1 {.}.png {.}.jpg && rm {}'
 ```
 **or** you can skip this conversion step and train from raw png files by adding the flag `--png` when training, at the expense of slower load times.
+
+The above conversion command creates images which match their experiments (see [Monodepth2](https://github.com/nianticlabs/monodepth2)), where KITTI `.png` images were converted to `.jpg` on Ubuntu 16.04 
+with default chroma subsampling 2x2,1x1,1x1. They found that Ubuntu 18.04 defaults to 2x2,2x2,2x2, which gives different results, hence 
+the explicit parameter in the conversion command.
 ## Inference
 
 ```bash
@@ -117,3 +130,8 @@ training pipeline on my ec2 instance, utilizing the full dataset.
 ```bash
 python -m src.overfit.local_trainer
 ```
+
+## Jupyter notebooks
+
+You can also find some useful jupyter notebooks which have the purpose of illustrating the functionality of main parts
+of this project.
