@@ -20,7 +20,7 @@ def normalize_image(im):
 
 def disp_to_depth(disp, min_depth, max_depth):
     """
-        Convert network's sigmoid output into depth prediction.
+        Convert network's sigmoid output_images into depth prediction.
         The formula for this conversion is given in the 'additional considerations' section of the paper.
     """
     min_disp = 1 / max_depth
@@ -107,7 +107,7 @@ def get_translation_matrix(translation_vector):
     return T
 def transformation_from_parameters(axisangle, translation, invert=False):
     """
-        Convert the network's (axisangle, translation) output into a 4x4 matrix
+        Convert the network's (axisangle, translation) output_images into a 4x4 matrix
     """
     R = rot_from_axisangle(axisangle)
     t = translation.clone()

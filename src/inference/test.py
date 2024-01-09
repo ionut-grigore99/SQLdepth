@@ -8,24 +8,19 @@ import PIL.Image as pil
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import torch
 from torchvision import transforms
 
 
 from ..models.SQLDepth import SQLdepth
-from ..config.conf import OverfitConf, ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
-
-# Models which were trained with stereo supervision were trained with a nominal baseline of 0.1 units.
-# The KITTI rig has a baseline of 54cm. Therefore, to convert our stereo predictions to real-world scale we multiply our depths by 5.4.
-STEREO_SCALE_FACTOR = 5.4
+from ..config.conf import ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
 
 def test_simple(conf):
     """
-        Function to predict for a single image or folder of images
+        Function to predict depth map(s) for a single image or folder of images as input.
     """
-
+    get = lambda x: conf.get(x)
     if torch.cuda.is_available() and get('use_cuda'):
         device = torch.device("cuda")
     else:
@@ -43,15 +38,15 @@ def test_simple(conf):
     if os.path.isfile(get('image_path_inference')):
         # Only testing on a single image
         paths = [get('image_path_inference')]
-        output_directory = os.path.join(os.path.dirname(__file__), "output")
+        output_directory = os.path.join(os.path.dirname(__file__), "output_images")
     elif os.path.isdir(get('image_path_inference')):
-        # Searching folder for images
+        # Testing on a folder of images
         paths = glob.glob(os.path.join(get('image_path_inference'), '*.{}'.format(get('image_extension_inference'))))
-        output_directory = os.path.join(os.path.dirname(__file__), "output")
+        output_directory = os.path.join(os.path.dirname(__file__), "output_images")
     else:
         raise Exception("Can not find get('image_path_inference'): {}".format(get('image_path_inference')))
 
-    print("-> Predicting on {:d} test images".format(len(paths)))
+    print("-> Predicting on {:d} test image(s)".format(len(paths)))
 
     # Predicting on each image
     with torch.no_grad():
@@ -66,28 +61,30 @@ def test_simple(conf):
 
             # Prediction
             input_image = input_image.to(device)
-            outputs = model(input_image)
+            output_depth_map = model(input_image)
 
-            disp = outputs
-            disp_resized = torch.nn.functional.interpolate(disp, (original_height, original_width), mode="bilinear", align_corners=False)
-            breakpoint()
+            output_depth_map_resized = torch.nn.functional.interpolate(output_depth_map, (original_height, original_width), mode="bilinear", align_corners=False)
 
-            # Saving colormapped depth image
-            disp_resized_np = disp_resized.squeeze().cpu().numpy()
-            vmax = np.percentile(disp_resized_np, 95)
-            normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
-            mapper = cm.ScalarMappable(norm=normalizer, cmap='plasma_r')  # cmap='viridis', cmap='plasma_r'
-            colormapped_depth_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-            im = pil.fromarray(colormapped_depth_im)
+            # Saving color mapped depth image
+            output_depth_map_resized_np = output_depth_map_resized.squeeze().cpu().numpy()
+            vmax = np.percentile(output_depth_map_resized_np, 95)
+            # The 95th percentile is used here to ignore the top 5% of depth values which might be outliers.
+            # This is a common practice to enhance the contrast of the visualization by focusing on the range where most of the data lies.
+            normalizer = mpl.colors.Normalize(vmin=output_depth_map_resized_np.min(), vmax=vmax) # scale data values to the range [0, 1]. I
+            mapper = cm.ScalarMappable(norm=normalizer, cmap='plasma_r')  # choices: [cmap='viridis', cmap='plasma_r'].
+            color_depth_map = (mapper.to_rgba(output_depth_map_resized_np)[:, :, :3] * 255).astype(np.uint8) # (375, 1242, 3)
+
+            im = pil.fromarray(color_depth_map)
             output_name = os.path.splitext(os.path.basename(image_path))[0]  # this is basically 'img1' or 'img2' etc.
-            name_dest_im = os.path.join(output_directory, "{}_colormapped_depth_map.jpeg".format(output_name))
-            im.save(name_dest_im)
+            output_name = os.path.join(output_directory, "{}_color_depth_map.jpeg".format(output_name))
+            im.save(output_name)
 
 
-            # Saving uint16 output depth map
-            uint16_depth_map = (disp_resized_np * 1000).astype('uint16')
-            name_dest_im = os.path.join(output_directory, "{}_uint16_depth_map.png".format(output_name))
-            pil.fromarray(uint16_depth_map).save(name_dest_im)
+            # Saving uint16 output_images depth map
+            uint16_depth_map = (output_depth_map_resized_np * 1000).astype('uint16') # (375, 1242)
+            output_name = os.path.splitext(os.path.basename(image_path))[0]  # this is basically 'img1' or 'img2' etc.
+            output_name = os.path.join(output_directory, "{}_uint16_depth_map.png".format(output_name))
+            pil.fromarray(uint16_depth_map).save(output_name)
 
 
 
@@ -101,7 +98,6 @@ if __name__ == '__main__':
 
     lt.monkey_patch()
 
-    conf = ConvNeXtLarge_320x1024_Conf().conf # ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
-    get = lambda x: conf.get(x)
+    conf = ResNet50_320x1024_Conf().conf # ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
 
     test_simple(conf)

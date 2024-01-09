@@ -34,7 +34,7 @@ class ConvNeXtLEncoderDecoder(nn.Module):
             global_pool (str): global pool type (default: 'avg')
             **: other kwargs are model specific for more information;
     backbone_indices: list, default=None
-            Out indices, selects which indices to output.
+            Out indices, selects which indices to output_images.
     decoder_use_batchnorm: boolean, default=True
             If "True", "BatchNormalisation" layer between "Conv2D" and "Activation" layers is used.
     decoder_channels: tuple, default=(256, 128, 64, 32, 16)
@@ -42,7 +42,7 @@ class ConvNeXtLEncoderDecoder(nn.Module):
     in_channels: int, default=1
             Specifies the channel number of the image.
     num_classes: int, default=5
-            A number of classes for output (output shape - "(batch, classes, h, w)").
+            A number of classes for output_images (output_images shape - "(batch, classes, h, w)").
     center: boolean, default=False
             If "True" add "Conv2dReLU" block on encoder head.
     norm_layer: torch.nn.Module, default=nn.BatchNorm2d

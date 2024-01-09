@@ -91,7 +91,7 @@ def evaluate(conf):
 
     assert get('evaluation_mode') in ["mono", "stereo"], "Please choose mono or stereo evaluation by setting evaluation_mode to 'mono' or 'stereo'!"
 
-    if get('numpy_disparities_to_evaluate') is None:
+    if get('numpy_depth_maps_to_evaluate') is None:
         assert os.path.isdir(get('pretrained_models_folder')), "Cannot find a folder at {}".format(get('pretrained_models_folder'))
 
         print("-> Loading weights from {}".format(get('pretrained_models_folder')))
@@ -108,6 +108,7 @@ def evaluate(conf):
         count_parameters(model.depth_decoder)
         model.from_pretrained()
 
+        # Uncomment this only if I am on CUDA!
         # model.to('cuda')
         # model = torch.nn.DataParallel(model)
         # model.eval()
@@ -121,53 +122,49 @@ def evaluate(conf):
         # model.depth_decoder.eval()
 
 
-        pred_disps = []
+        pred_depth_maps = []
         src_imgs = []
         error_maps = []
 
         print("-> Computing predictions with size {}x{}".format(conf.get('im_sz')[1], conf.get('im_sz')[0]))
 
-        step = 0
         with torch.no_grad():
             for data in tqdm(dataloader):
-                step = step + 1
                 # input_color = data[("color", 0, 0)].cuda()
                 input_color = data[("color", 0, 0)] # tensor[1, 3, 320, 1024] with values between 0 and 1!
-                breakpoint()
 
                 if get('evaluation_post_process'): # for flipping post processing from the original Monodepth paper!
-                    # Post-processed results require each image to have two forward passes
+                    # Post-processed results require each image to have two forward passes so we concatenate!
                     input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0) # tensor[2, 3, 320, 1024] with values between 0 and 1!
 
-                output = model(input_color)
+                pred_depth = model(input_color)
 
-                pred_disp = output
-                pred_disp = pred_disp.cpu()[:, 0].numpy()  # if get('evaluation_post_process') is True, then pred_disp.shape is (2, 160, 512) <-> (2, H/2, W/2)
+                pred_depth = pred_depth.cpu()[:, 0].numpy()  # if get('evaluation_post_process') is True, then pred_disp.shape is (2, 160, 512) <-> (2, H/2, W/2)
 
                 if get('evaluation_post_process'): # flipping post processing from the original Monodepth paper!
-                    N = pred_disp.shape[0] // 2
-                    pred_disp = batch_post_process_disparity(pred_disp[:N], pred_disp[N:, :, ::-1])
+                    N = pred_depth.shape[0] // 2
+                    pred_depth = batch_post_process_disparity(pred_depth[:N], pred_depth[N:, :, ::-1])
+                    # In our case, the prediction of the model is depth instead of disparity.
 
-                pred_disps.append(pred_disp)
+                pred_depth_maps.append(pred_depth)
                 # src_imgs.append(data[("color", 0, 0)])
 
-        pred_disps = np.concatenate(pred_disps)
+        pred_depth_maps = np.concatenate(pred_depth_maps)
         # src_imgs = np.concatenate(src_imgs)
 
-    else: # o prostie chestia asta oricum pentru ca nu o folosesc.
+    else: # optional path to a .npy disparities file to evaluate, in case when I save them on the disk
         # Load predictions from file
         print("-> Loading predictions from {}".format(get('numpy_disparities_to_evaluate')))
-        pred_disps = np.load(get('numpy_disparities_to_evaluate'))
+        pred_depth_maps = np.load(get('numpy_disparities_to_evaluate'))
 
         if get('evaluate_eigen_to_benchmark'):
             eigen_to_benchmark_ids = np.load(os.path.join(splits_dir, "benchmark", "eigen_to_benchmark_ids.npy"))
-            #IDK where to find eigen_to_benchmark_ids.npy file!
-            pred_disps = pred_disps[eigen_to_benchmark_ids]
+            pred_depth_maps = pred_depth_maps[eigen_to_benchmark_ids]
 
     if get('save_predicted_disparities'):
-        output_path = os.path.join(get('pretrained_models_folder'), "disps_{}_split.npy".format(get('evaluation_split')))
+        output_path = os.path.join(get('pretrained_models_folder'), "disparities_{}_split.npy".format(get('evaluation_split')))
         print("-> Saving predicted disparities to ", output_path)
-        np.save(output_path, pred_disps)
+        np.save(output_path, pred_depth_maps)
         # src_imgs_path = os.path.join(get('pretrained_models_folder'), "src_{}_split.npy".format(get('evaluation_split')))
         # print("-> Saving src imgs to ", src_imgs_path)
         # np.save(src_imgs_path, src_imgs)
@@ -176,19 +173,20 @@ def evaluate(conf):
         print("-> Evaluation disabled. Done.")
         quit()
 
-    elif get('evaluation_split') == 'benchmark':
-        save_dir = os.path.join(get('load_weights_folder'), "benchmark_predictions")
-        print("-> Saving out benchmark predictions to {}".format(save_dir))
+    elif get('evaluation_split') == 'benchmark': # No ground truth is available for the KITTI benchmark,so not evaluating,
+                                                 # just saving the predicted disparities for further online evaluation.
+        save_dir = os.path.join(get('pretrained_models_folder'), "benchmark_predictions")
+        print("-> Saving benchmark predictions to {}".format(save_dir))
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        for idx in range(len(pred_disps)):
-            disp_resized = cv2.resize(pred_disps[idx], (1216, 352))
-            depth = STEREO_SCALE_FACTOR / disp_resized
-            depth = np.clip(depth, 0, 80)
-            depth = np.uint16(depth * 256)
+        for idx in range(len(pred_depth_maps)):
+            depth_map_resized = cv2.resize(pred_depth_maps[idx], (1216, 352))
+            depth_map = STEREO_SCALE_FACTOR / depth_map_resized
+            depth_map = np.clip(depth_map, 0, 80)
+            depth_map = np.uint16(depth_map * 256)
             save_path = os.path.join(save_dir, "{:010d}.png".format(idx))
-            cv2.imwrite(save_path, depth)
+            cv2.imwrite(save_path, depth_map)
 
         print("-> No ground truth is available for the KITTI benchmark, so not evaluating. Done.")
         quit()
@@ -209,12 +207,12 @@ def evaluate(conf):
     errors = []
     ratios = []
 
-    for i in range(pred_disps.shape[0]):
+    for i in range(pred_depth_maps.shape[0]):
 
         gt_depth = gt_depths[i]
         gt_height, gt_width = gt_depth.shape[:2]
 
-        pred_disp = pred_disps[i]
+        pred_disp = pred_depth_maps[i]
         pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
         pred_depth = pred_disp
 
@@ -268,7 +266,6 @@ if __name__ == "__main__":
     lt.monkey_patch()
 
     conf = ResNet50_320x1024_Conf().conf  # ResNet50_320x1024_Conf, ResNet50_192x640_Conf, ConvNeXtLarge_320x1024_Conf, Effb5_320x1024_Conf
-    get = lambda x: conf.get(x)
 
     evaluate(conf)
 
