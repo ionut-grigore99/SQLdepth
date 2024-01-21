@@ -107,7 +107,7 @@ python -m src.evaluation.evaluate_depth
 The structure of folder containing the pretrained weights should look like this:
 <br />
 
-![img.png](assets/pretrained_weights_folder.png)
+![pretrained_weights_folder.png](assets%2Fpretrained_weights_folder.png)
 
 #### Evaluation split: eigen
 | Model     | Params | WxH | abs rel | sq rel | RMSE  | RMSE log | a1    | a2    | a3    |
