@@ -44,7 +44,7 @@ or
 pip install -e . && pip install -e ".[dev]"
 ```
 
-Recommended to install the [dev] dependencies.
+Recommended to install the `[dev]` dependencies.
 
 Sanity test: enter python command-line interface and run:
 ```bash
@@ -118,7 +118,7 @@ The structure of folder containing the pretrained weights should look like this:
 | KITTI (ConvNeXt-L) | 242,150,304  | 1024x320 | 0.074   | 0.491  | 3.578 | 0.150 | 0.939 | 0.974 | 0.986 |
 
 #### Paper reported results:
-![img.png](assets/paper_reported_results_eigen.png)
+![img_1.png](assets/paper_reported_results_eigen.png)
 #### Evaluation split: eigen_benchmark
 | Model     | Params | WxH | abs rel | sq rel | RMSE  | RMSE log | a1    | a2    | a3    |
 |-----------|--------|-----|-------|-------|-------|-------|-------|-------|-------|
