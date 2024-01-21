@@ -15,14 +15,19 @@ almost every self-supervised depth estimation method/paper/repo is based on (als
 ![img.png](assets/theory_1.png)
 ![img_2.png](assets/theory_2.png)
 ## Instalation
+Requirements: `Ubuntu 20.04`, `NVIDIA GPU`, `CUDA >= 11.7`
+
+You'll probably find useful this documentation [Cuda-installation-guide-Linux](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#conda-installation) and also
+this:
+```bash
+conda install cuda -c nvidia
+```
+
+In the end the goal is to be able to install `mamba-ssm` package but we'll do this in the following steps.
 
 First create a conda environment called **sqldepth**:
 ```bash
-conda create --name sqldepth --clone base 
-```
-or without cloning the base:
-```bash
-conda create --name sqldepth
+conda create -n sqldepth  python=3.10  
 ```
 
 Activate the new enviroment:
@@ -40,6 +45,12 @@ pip install -e . && pip install -e ".[dev]"
 ```
 
 Recommended to install the [dev] dependencies.
+
+Sanity test: enter python command-line interface and run:
+```bash
+import torch
+import mamba_ssm
+```
 
 ## KITTI training data
 You can download the entire [raw KITTI dataset](https://www.cvlibs.net/datasets/kitti/raw_data.php) by running:
@@ -92,6 +103,11 @@ python -m src.evaluation.evaluate_depth
 ```
 
 ### Evaluation of the pretrained models
+
+The structure of folder containing the pretrained weights should look like this:
+<br />
+
+![img.png](assets/pretrained_weights_folder.png)
 
 #### Evaluation split: eigen
 | Model     | Params | WxH | abs rel | sq rel | RMSE  | RMSE log | a1    | a2    | a3    |
