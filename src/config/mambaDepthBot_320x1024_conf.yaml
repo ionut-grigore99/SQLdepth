@@ -1,0 +1,70 @@
+#TODO: to put relevant description to each element in this yaml file.
+model_name: "mambaDepthBot_320x1024"
+
+# model
+# -----------
+num_input_channels: 3
+deep_supervision: True
+num_segmentation_heads: 3
+UNet_base_num_features: 32
+n_conv_per_stage_encoder: [2, 2, 2, 2, 2, 2, 2, 2]
+n_conv_per_stage_decoder: [2, 2, 2, 2, 2, 2, 2]
+pool_op_kernel_sizes: [[1, 1], [2, 2], [2, 2], [2, 2], [2, 2], [2, 2], [2, 2], [2, 2]]
+conv_kernel_sizes: [[3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3]]
+unet_max_num_features: 512
+
+
+# misc
+# -----------
+data_path: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/data/kitti/kitti_data'
+tensorboard_path: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/tensorboard'
+pretrained_models_folder: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/pretrained/KITTI_MambaDepthBot_320x1024_models'
+image_path_inference: '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images/img2.png'
+                     # I can also give an entire folder with images, not just one image!
+                     # choices: ['/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images/img2.png',
+                     #          '/home/ANT.AMAZON.COM/grigiono/Desktop/SQLdepth/src/inference/input_images']
+image_extension_inference: "png"
+use_cuda: True
+num_workers: 8
+im_sz: [320, 1024] # H W
+bs: 16
+
+# training
+# -----------
+training_dataset: "kitti" # dataset to train on; choices=["kitti", "kitti_odom", "kitti_depth", "kitti_test", "cityscapes_preprocessed", "nyu_raw"])
+num_epochs: 20 # number of epochs for training.
+training_split: "eigen_zhou" # which training split to use;  choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "cityscapes_preprocessed", "nyu_raw"],
+learning_rate: 1e-4
+scheduler_step_size: 15 # step size of the scheduler used for training.
+use_stereo_training: True # if set, uses stereo pair for training.
+frame_ids_training: [0, -1, 1] # frames to use for training (current, previous and next); choices: [0, -1, 1], [0, 1]
+loss_scales: [0] # scales used in the loss; choices: [0]; [0, 1, 2, 3]
+pose_model_input: "pairs" # how many images the pose network gets; choices=["pairs", "all"]
+load_pretrained_model: False # if set, uses pretrained encoder and depth decoder for training (both of them!).
+load_pretrained_pose: False # if set, uses pretrained PoseNet for training.
+train_from_png: True # if set, trains from raw KITTI png files (instead of jpgs).
+use_different_learning_rate: False # if set, uses different learning rate for training.
+save_frequency: 1 # number of epochs between each save.
+log_frequency: 10 # number of batches between each tensorboard log.
+use_ssim: True # if set, uses SSIM in the loss.
+use_predictive_mask: True # if set, uses a predictive masking scheme as in Zhou et al (in what paper?).
+disable_automasking: True # if set, doesn't do auto-masking.
+disparity_smoothness_weight: 1e-3
+use_average_reprojection: True # if set, uses average reprojection loss.
+monodepthv1_multiscale: True # if set, uses Monodepthv1 multiscale.
+pose_model_type: posecnn # choices=["posecnn", "pose_flow", "separate_resnet", "shared"] -> what are these options??
+models_to_load: ["encoder", "depth", "pose_encoder", "pose"]
+
+
+# evaluation
+# -----------
+evaluation_split: eigen #choices=["eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10", "cityscapes"]
+evaluation_mode: mono # choices=["mono", "stereo"]
+evaluation_post_process: True # if set will perform the flipping post processing from the original Monodepth paper.
+                              # "Unsupervised Monocular Depth Estimation With Left-Right Consistency", pg.5, bottom-right.
+prediction_depth_scale_factor: 1 # if set multiplies predictions by this number.
+save_predicted_disparities: False # if set saves predicted disparities.
+numpy_disparities_to_evaluate:  # optional path to a .npy disparities file to evaluate.
+evaluate_eigen_to_benchmark: False # if set assume we are loading eigen results from .npy but we want to evaluate using the new benchmark.
+no_evaluation: False # if set disables evaluation
+disable_median_scaling: False # if set disables median scaling in evaluation.

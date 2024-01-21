@@ -54,3 +54,23 @@ class ConvNeXtLarge_320x1024_Conf:
     def __post_init__(self):
         with open(Path(__file__).parent / self.name, 'r') as f:
             self.conf = yaml.safe_load(f)
+
+
+##################------yamls for the Mamba models------##################
+
+@dataclass
+class MambaDepthBot_320x1024_Conf:
+    name: str = 'mambaDepthBot_320x1024_conf.yaml'
+
+    def __post_init__(self):
+        with open(Path(__file__).parent / self.name, 'r') as f:
+            self.conf = yaml.safe_load(f)
+
+
+@dataclass
+class MambaDepthEnc_320x1024_Conf:
+    name: str = 'mambaDepthEnc_320x1024_conf.yaml'
+
+    def __post_init__(self):
+        with open(Path(__file__).parent / self.name, 'r') as f:
+            self.conf = yaml.safe_load(f)
